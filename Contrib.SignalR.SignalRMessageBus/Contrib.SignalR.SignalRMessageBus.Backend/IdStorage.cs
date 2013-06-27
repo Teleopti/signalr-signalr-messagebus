@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.IO.IsolatedStorage;
+using System.Threading;
 
 namespace Contrib.SignalR.SignalRMessageBus.Backend
 {
@@ -17,15 +18,15 @@ namespace Contrib.SignalR.SignalRMessageBus.Backend
 				{
 					var result = streamReader.ReadToEnd();
 
-					ulong value;
-					if (ulong.TryParse(result, out value))
+					long value;
+					if (long.TryParse(result, out value))
 					{
-						LastId = value;
+						_nextId = value;
 						return;
 					}
 				}
 			}
-			LastId = ulong.MinValue;
+			_nextId = long.MinValue;
 		}
 
 		public void OnStop()
@@ -35,10 +36,15 @@ namespace Contrib.SignalR.SignalRMessageBus.Backend
 			using (var stream = store.OpenFile(FileName, FileMode.OpenOrCreate, FileAccess.Write))
 			using (var streamWriter = new StreamWriter(stream))
 			{
-				streamWriter.Write(LastId);
+				streamWriter.Write(_nextId);
 			}
 		}
 
-		public static ulong LastId { get; set; }
+		private static long _nextId;
+
+		public static long NextId()
+		{
+			return Interlocked.Increment(ref _nextId);
+		}
 	}
 }
