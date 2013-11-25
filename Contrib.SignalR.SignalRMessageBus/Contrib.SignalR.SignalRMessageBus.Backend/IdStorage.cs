@@ -1,5 +1,7 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.IO.IsolatedStorage;
+using System.Security;
 using System.Threading;
 
 namespace Contrib.SignalR.SignalRMessageBus.Backend
@@ -9,6 +11,13 @@ namespace Contrib.SignalR.SignalRMessageBus.Backend
 		private const string FileName = "LastKnownId.key";
 
 		public void OnStart()
+		{
+			if (attemptIsolatedStorageOperation(tryLoadLastId)) return;
+
+			_nextId = long.MinValue;
+		}
+
+		private static bool tryLoadLastId()
 		{
 			var store = IsolatedStorageFile.GetUserStoreForAssembly();
 			if (store.FileExists(FileName))
@@ -22,14 +31,37 @@ namespace Contrib.SignalR.SignalRMessageBus.Backend
 					if (long.TryParse(result, out value))
 					{
 						_nextId = value;
-						return;
+						return true;
 					}
 				}
 			}
-			_nextId = long.MinValue;
+
+			return false;
 		}
 
 		public void OnStop()
+		{
+			attemptIsolatedStorageOperation(trySaveLastId);
+		}
+
+		private static bool attemptIsolatedStorageOperation(Func<bool> isolatedStorageOperation)
+		{
+			try
+			{
+				return isolatedStorageOperation();
+			}
+			catch (SecurityException)
+			{
+				
+			}
+			catch (IsolatedStorageException)
+			{
+				
+			}
+			return false;
+		}
+
+		private static bool trySaveLastId()
 		{
 			var store = IsolatedStorageFile.GetUserStoreForAssembly();
 
@@ -38,6 +70,8 @@ namespace Contrib.SignalR.SignalRMessageBus.Backend
 			{
 				streamWriter.Write(_nextId);
 			}
+
+			return true;
 		}
 
 		private static long _nextId;
