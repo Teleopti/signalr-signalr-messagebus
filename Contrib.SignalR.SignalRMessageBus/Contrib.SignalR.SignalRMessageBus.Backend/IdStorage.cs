@@ -21,7 +21,7 @@ namespace Contrib.SignalR.SignalRMessageBus.Backend
 
 		private static bool tryLoadLastId()
 		{
-			var store = IsolatedStorageFile.GetUserStoreForAssembly();
+			var store = IsolatedStorageFile.GetMachineStoreForAssembly();
 			if (store.FileExists(FileName))
 			{
 				using (var stream = store.OpenFile(FileName, FileMode.OpenOrCreate, FileAccess.Read))
@@ -65,7 +65,7 @@ namespace Contrib.SignalR.SignalRMessageBus.Backend
 
 		private static bool trySaveLastId()
 		{
-			var store = IsolatedStorageFile.GetUserStoreForAssembly();
+			var store = IsolatedStorageFile.GetMachineStoreForAssembly();
 
 			using (var stream = store.OpenFile(FileName, FileMode.OpenOrCreate, FileAccess.Write))
 			using (var streamWriter = new StreamWriter(stream))
