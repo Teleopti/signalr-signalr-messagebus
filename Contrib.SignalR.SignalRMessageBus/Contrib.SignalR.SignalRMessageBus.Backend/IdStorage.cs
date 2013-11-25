@@ -3,12 +3,14 @@ using System.IO;
 using System.IO.IsolatedStorage;
 using System.Security;
 using System.Threading;
+using log4net;
 
 namespace Contrib.SignalR.SignalRMessageBus.Backend
 {
 	public class IdStorage
 	{
 		private const string FileName = "LastKnownId.key";
+		private static readonly ILog Logger = LogManager.GetLogger(typeof (IdStorage));
 
 		public void OnStart()
 		{
@@ -50,13 +52,13 @@ namespace Contrib.SignalR.SignalRMessageBus.Backend
 			{
 				return isolatedStorageOperation();
 			}
-			catch (SecurityException)
+			catch (SecurityException ex)
 			{
-				
+				Logger.Warn("An issue occurred while trying to use the isolated storage, message broker use might be unstable due to this. Check this (http://labs.episerver.com/en/Blogs/Svante-Seleborg/Dates/2008/10/IsolatedStorage-Access-Denied/) for details on how to overcome this issue.", ex);
 			}
-			catch (IsolatedStorageException)
+			catch (IsolatedStorageException ex)
 			{
-				
+				Logger.Warn("An issue occurred while trying to use the isolated storage, message broker use might be unstable due to this. Check this (http://labs.episerver.com/en/Blogs/Svante-Seleborg/Dates/2008/10/IsolatedStorage-Access-Denied/) for details on how to overcome this issue.", ex);
 			}
 			return false;
 		}
