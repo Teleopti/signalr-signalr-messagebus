@@ -11,7 +11,7 @@ using System.Resources;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Teleopti")]
 [assembly: AssemblyProduct("Contrib.SignalR.SignalRMessageBus")]
-[assembly: AssemblyCopyright("Copyright © Teleopti 2013")]
+[assembly: AssemblyCopyright("Copyright © Teleopti 2014")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -33,6 +33,6 @@ using System.Resources;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.1.7.0")]
-[assembly: AssemblyInformationalVersion("1.1.7")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyInformationalVersion("1.2.0")]
 [assembly: NeutralResourcesLanguageAttribute("en")]
