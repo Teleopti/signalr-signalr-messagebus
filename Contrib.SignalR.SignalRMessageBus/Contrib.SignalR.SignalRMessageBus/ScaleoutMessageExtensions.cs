@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using Microsoft.AspNet.SignalR.Messaging;
 
 namespace Contrib.SignalR.SignalRMessageBus

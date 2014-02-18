@@ -12,8 +12,8 @@ namespace Contrib.SignalR.SignalRMessageBus
     public class SignalRMessageBus : ScaleoutMessageBus
     {
     	private readonly Connection _connection;
-    	private Task startTask;
-	    private const int StreamIndex = 0;
+    	private Task _startTask;
+	    private const int streamIndex = 0;
 
 	    public SignalRMessageBus(SignalRScaleoutConfiguration scaleoutConfiguration, IDependencyResolver dependencyResolver)
 			: base(dependencyResolver, scaleoutConfiguration)
@@ -25,15 +25,13 @@ namespace Contrib.SignalR.SignalRMessageBus
 					Debug.WriteLine(e.ToString());
 					OnError(0, e);
 				};
-    		startTask = _connection.Start();
-		    startTask.ContinueWith(t =>
+    		_startTask = _connection.Start();
+		    _startTask.ContinueWith(t =>
 			    {
-				    throw t.Exception.GetBaseException();
+				    if (t.IsFaulted && t.Exception != null)
+					    throw t.Exception.GetBaseException();
 			    }, TaskContinuationOptions.OnlyOnFaulted);
-		    startTask.ContinueWith(_ =>
-			    {
-				    Open(StreamIndex);
-			    }, TaskContinuationOptions.OnlyOnRanToCompletion);
+		    _startTask.ContinueWith(_ => Open(streamIndex), TaskContinuationOptions.OnlyOnRanToCompletion);
         }
 
     	private void notificationRecieved(string obj)
@@ -43,10 +41,10 @@ namespace Contrib.SignalR.SignalRMessageBus
 
 			if (message.Messages == null || message.Messages.Count == 0)
 			{
-				Open(StreamIndex);
+				Open(streamIndex);
 			}
 
-			OnReceived(StreamIndex, (ulong)Convert.ToInt64(obj.Substring(0, indexOfFirstHash)), message);
+			OnReceived(streamIndex, (ulong)Convert.ToInt64(obj.Substring(0, indexOfFirstHash)), message);
     	}
 
 		protected override Task Send(IList<Message> messages)
@@ -60,16 +58,17 @@ namespace Contrib.SignalR.SignalRMessageBus
 
 			if (_connection.State == ConnectionState.Disconnected)
 			{
-				startTask = _connection.Start();
-				startTask.ContinueWith(t =>
-				{
-					throw t.Exception.GetBaseException();
-				}, TaskContinuationOptions.OnlyOnFaulted);
+				_startTask = _connection.Start();
+				_startTask.ContinueWith(t =>
+					{
+						if (t.IsFaulted && t.Exception != null)
+							throw t.Exception.GetBaseException();
+					}, TaskContinuationOptions.OnlyOnFaulted);
 			}
 
-			if (!startTask.IsCompleted)
+			if (!_startTask.IsCompleted)
 			{
-				startTask.Wait();
+				_startTask.Wait();
 			}
 
 			return _connection.Send("s:"+messages.ToScaleoutString());
