@@ -21,11 +21,7 @@ namespace Contrib.SignalR.SignalRMessageBus
 			_connection = new Connection(scaleoutConfiguration.ServerUri.ToString());
 			_connection.Closed += connectionOnClosed;
     		_connection.Received += notificationRecieved;
-			_connection.Error += e =>
-				{
-					Debug.WriteLine(e.ToString());
-					OnError(0, e);
-				};
+			_connection.Error += onConnectionOnError;
     		var startTask = _connection.Start();
 		    startTask.ContinueWith(t =>
 			    {
@@ -34,6 +30,12 @@ namespace Contrib.SignalR.SignalRMessageBus
 			    }, TaskContinuationOptions.OnlyOnFaulted);
 		    startTask.ContinueWith(_ => Open(streamIndex), TaskContinuationOptions.OnlyOnRanToCompletion);
         }
+
+	    private void onConnectionOnError(Exception e)
+	    {
+		    Debug.WriteLine(e.ToString());
+		    OnError(0, e);
+	    }
 
 	    private void connectionOnClosed()
 	    {
@@ -70,18 +72,18 @@ namespace Contrib.SignalR.SignalRMessageBus
 			OnReceived(streamIndex, (ulong)Convert.ToInt64(obj.Substring(0, indexOfFirstHash)), message);
     	}
 
-		protected override Task Send(IList<Message> messages)
-		{
-			var emptyTask = makeEmptyTask();
-			if (messages == null || messages.Count == 0)
-			{
-				return emptyTask;
-			}
+	    protected override Task Send(IList<Message> messages)
+	    {
+		    if (messages == null || 
+				messages.Count == 0 || 
+				_connection.State != ConnectionState.Connected)
+		    {
+				return makeEmptyTask();
+		    }
 
-			return _connection.State == ConnectionState.Connected
-				       ? _connection.Send("s:" + messages.ToScaleoutString())
-				       : emptyTask;
-		}
+		    return _connection.Send("s:" + messages.ToScaleoutString());
+
+	    }
 
 	    private static Task makeEmptyTask()
 	    {
@@ -94,7 +96,11 @@ namespace Contrib.SignalR.SignalRMessageBus
 		{
 			if (disposing)
 			{
-				_connection.Stop();
+				_connection.Closed -= connectionOnClosed;
+				_connection.Received -= notificationRecieved;
+				_connection.Error -= onConnectionOnError;
+				if (_connection.State == ConnectionState.Connected)
+					_connection.Stop();
 			}
 		}
     }
