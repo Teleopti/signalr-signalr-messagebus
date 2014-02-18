@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNet.SignalR;
 using Microsoft.AspNet.SignalR.Client;
@@ -12,29 +13,51 @@ namespace Contrib.SignalR.SignalRMessageBus
     public class SignalRMessageBus : ScaleoutMessageBus
     {
     	private readonly Connection _connection;
-    	private Task _startTask;
 	    private const int streamIndex = 0;
 
 	    public SignalRMessageBus(SignalRScaleoutConfiguration scaleoutConfiguration, IDependencyResolver dependencyResolver)
 			: base(dependencyResolver, scaleoutConfiguration)
         {
 			_connection = new Connection(scaleoutConfiguration.ServerUri.ToString());
+			_connection.Closed += connectionOnClosed;
     		_connection.Received += notificationRecieved;
 			_connection.Error += e =>
 				{
 					Debug.WriteLine(e.ToString());
 					OnError(0, e);
 				};
-    		_startTask = _connection.Start();
-		    _startTask.ContinueWith(t =>
+    		var startTask = _connection.Start();
+		    startTask.ContinueWith(t =>
 			    {
 				    if (t.IsFaulted && t.Exception != null)
 					    throw t.Exception.GetBaseException();
 			    }, TaskContinuationOptions.OnlyOnFaulted);
-		    _startTask.ContinueWith(_ => Open(streamIndex), TaskContinuationOptions.OnlyOnRanToCompletion);
+		    startTask.ContinueWith(_ => Open(streamIndex), TaskContinuationOptions.OnlyOnRanToCompletion);
         }
 
-    	private void notificationRecieved(string obj)
+	    private void connectionOnClosed()
+	    {
+		    delay(TimeSpan.FromSeconds(5)).Wait();
+			var startTask = _connection.Start();
+			startTask.ContinueWith(t =>
+			{
+				if (t.IsFaulted && t.Exception != null)
+					throw t.Exception.GetBaseException();
+			}, TaskContinuationOptions.OnlyOnFaulted);
+	    }
+
+		private static Task delay(TimeSpan timeOut)
+		{
+			var tcs = new TaskCompletionSource<object>();
+
+			var timer = new Timer(tcs.SetResult,
+								  null,
+								  timeOut,
+								  TimeSpan.FromMilliseconds(-1));
+			return tcs.Task.ContinueWith(_ => timer.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+		}
+
+	    private void notificationRecieved(string obj)
     	{
     		var indexOfFirstHash = obj.IndexOf('#');
     		var message = obj.Substring(indexOfFirstHash + 3).ToScaleoutMessage();
@@ -48,33 +71,26 @@ namespace Contrib.SignalR.SignalRMessageBus
     	}
 
 		protected override Task Send(IList<Message> messages)
-        {
+		{
+			var emptyTask = makeEmptyTask();
 			if (messages == null || messages.Count == 0)
 			{
-				var emptyTask = new TaskCompletionSource<object>();
-				emptyTask.SetResult(null);
-				return emptyTask.Task;
+				return emptyTask;
 			}
 
-			if (_connection.State == ConnectionState.Disconnected)
-			{
-				_startTask = _connection.Start();
-				_startTask.ContinueWith(t =>
-					{
-						if (t.IsFaulted && t.Exception != null)
-							throw t.Exception.GetBaseException();
-					}, TaskContinuationOptions.OnlyOnFaulted);
-			}
+			return _connection.State == ConnectionState.Connected
+				       ? _connection.Send("s:" + messages.ToScaleoutString())
+				       : emptyTask;
+		}
 
-			if (!_startTask.IsCompleted)
-			{
-				_startTask.Wait();
-			}
+	    private static Task makeEmptyTask()
+	    {
+		    var emptyTask = new TaskCompletionSource<object>();
+		    emptyTask.SetResult(null);
+		    return emptyTask.Task;
+	    }
 
-			return _connection.Send("s:"+messages.ToScaleoutString());
-        }
-
-		protected override void Dispose(bool disposing)
+	    protected override void Dispose(bool disposing)
 		{
 			if (disposing)
 			{
